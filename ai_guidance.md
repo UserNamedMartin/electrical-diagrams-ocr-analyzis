@@ -29,7 +29,7 @@ Purpose: This file gives future AIs the context and rules to continue mentoring 
   - Architecture boundaries: keep pure logic in `core`, IO in `services`, types in `models`, and CLI/config in `app`/`config`.
   - Prefer readability: meaningful names, early returns, explicit error handling. Avoid deep nesting.
   - Use Pydantic v2 for data models and `BaseSettings` for configuration.
-  - Use `typer` for CLI. Use `litellm` for LLM calls. Use `pymupdf` for PDF→image. Use `jinja2` for prompts. Use `openpyxl` for Excel export.
+  - Use `argparse` for CLI. Use `litellm` for LLM calls. Use `pymupdf` for PDF→image. Use `jinja2` for prompts. Use `openpyxl` for Excel export.
   - Dynamic knobs: image dpi/format/quality, batch size, model, API key, prompt path, output dir, temperature, max tokens. Source: defaults in code, overridden by `.env`, finally by CLI.
   - MVP first: sequential batches, minimal features, clear extension points.
 
@@ -45,24 +45,24 @@ Purpose: This file gives future AIs the context and rules to continue mentoring 
 Folder layout (do not create everything upfront; add as needed):
 
 ```
-src/ed_ocr/
+src/ocr/                      # package (installed via pyproject console script)
   app/
-    cli.py                  # Typer CLI entrypoints
+    cli.py                    # argparse CLI entrypoint
   config/
-    settings.py             # Pydantic BaseSettings (dpi, batch, model, etc.)
+    settings.py               # Pydantic BaseSettings (model, api_key, pdf_path, dpi, etc.)
   models/
-    schemas.py              # Pydantic models (LegendState, LLMResponse, BatchSummary)
+    schemas.py                # Pydantic models (LegendState, LLMResponse, BatchSummary)
   core/
-    pipeline.py             # Orchestrator (pure flow orchestration logic)
-    logic.py                # Pure helpers (batching, merging legend)
+    pipeline.py               # Orchestrator (pure flow orchestration logic)
+    logic.py                  # Pure helpers (batching, merging legend)
   services/
-    pdf.py                  # PDF→images (pymupdf)
-    prompt.py               # Jinja2 prompt rendering
-    llm.py                  # litellm wrapper, JSON enforcement, retries
-    storage.py              # run dir mgmt + state IO + artifact writes
-    excel.py                # Excel export (openpyxl)
+    pdf.py                    # PDF→images (pymupdf)
+    prompt.py                 # Jinja2 prompt rendering
+    llm.py                    # litellm wrapper, JSON enforcement, retries
+    storage.py                # run dir mgmt + state IO + artifact writes
+    excel.py                  # Excel export (openpyxl)
 prompts/
-  legend_prompt.md
+  main.md
 assets/
   templates/
     board_template.xlsx
@@ -92,12 +92,13 @@ Configuration strategy:
 Each numbered item is one commit by the user, then reviewed by AI.
 
 1. Scaffold basics
-   - Create `src/ed_ocr/` with `app/`, `config/`, `models/`, `core/`, `services/` dirs and empty `__init__.py` files where needed.
+   - Create `src/ocr/` with `app/`, `config/`, `models/`, `core/`, `services/` dirs and empty `__init__.py` files where needed.
    - Defer `requirements.txt` pinning during development; create `.env.example` and `README.md` at the end once `.env` is finalized.
 
 2. Config + CLI skeleton
-   - Implement `config/settings.py` with `BaseSettings` (model, api_key, dpi, image_format, jpeg_quality, batch_size, prompt_path, output_dir, temperature, max_tokens).
-   - Implement `app/cli.py` with a `process` command accepting CLI overrides and printing effective settings.
+   - Implement `config/settings.py` with `BaseSettings` fields: `model`, `api_key`, `pdf_path`, `temperature`, `dpi`, `batch_size`, `output_dir`.
+   - Implement `app/cli.py` using `argparse`. Accept optional CLI overrides for those fields; instantiate `Settings(**overrides)` so precedence is CLI > `.env` > defaults; print effective settings for a smoke check.
+   - Expose a console script via `pyproject.toml` (e.g., `[project.scripts] ocr = "ocr.app.cli:main"`), install with `pip install -e .` and run via `ocr`.
 
 3. Models (schemas)
    - Implement `models/schemas.py` with LegendState, Circuit, Load, BatchSummary, LegendUpdate, HaltSignal union.
@@ -136,13 +137,17 @@ Acceptance per step: compiles/imports, basic smoke run where relevant, no archit
   - Evolve `requirements.txt` during development as dependencies are introduced, rather than upfront pinning.
   - Create `.env.example` and `README.md` at the end of implementation, after `.env` is finalized.
 
-- Dependencies (lean): `pydantic>=2`, `typer`, `jinja2`, `litellm`, `pymupdf`, `openpyxl` (optionally `rich` for logs).
-- Prompting: store a single `legend_prompt.md` with placeholders like `{legend_json}`, `{batch_pages}`, `{previous_summary}`; render with `jinja2`.
+- Dependencies (lean): `pydantic>=2`, `jinja2`, `litellm`, `pymupdf`, `openpyxl` (CLI uses stdlib `argparse`; optionally `rich` for logs).
+- Prompting: store a single `prompts/main.md` with placeholders like `{legend_json}`, `{batch_pages}`, `{previous_summary}`; render with `jinja2`.
 - Artifacts: under `runs/<timestamp>/` save `pages/`, `batches/<idx>/{prompt.md,response.json}`, `state.json`, and `final.xlsx` or `halt.json`.
 - Error handling: on invalid JSON, retry with a clarifying system message; on `type="halt"`, stop and persist context.
 - Performance: MVP uses sequential batches; consider concurrency later.
 - Configuration precedence: CLI > `.env` > code defaults. Keep `.env.example` up to date.
 - Simplicity-first: if choices are close, pick the simpler path that teaches clean boundaries and is easy to change later.
+
+- Packaging & entrypoint:
+  - Project is packaged with `pyproject.toml` and installed in editable mode during development (`pip install -e .`).
+  - Console script `ocr` runs `ocr.app.cli:main` without requiring `PYTHONPATH` setup.
 
 ---
 
