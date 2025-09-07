@@ -51,7 +51,7 @@ src/ocr/                      # package (installed via pyproject console script)
   config/
     settings.py               # Pydantic BaseSettings (model, api_key, pdf_path, dpi, etc.)
   models/
-    schemas.py                # Pydantic models (LegendState, LLMResponse, BatchSummary)
+    schemas.py                # Pydantic models (Legend, Circuit, LLMResponse)
   core/
     pipeline.py               # Orchestrator (pure flow orchestration logic)
     logic.py                  # Pure helpers (batching, merging legend)
@@ -70,17 +70,15 @@ assets/
 
 Key entities (keep minimal for MVP):
 - Legend domain
-  - LegendState: board_name, circuits: list[Circuit]
-  - Circuit: id, label, breaker_rating?, loads: list[Load]
-  - Load: name, type?, power_kw?, notes?
-- BatchSummary: batch_index, pages, notes?
-- LLMResponse (discriminated union)
-  - LegendUpdate: type="legend_update", legend: LegendState, batch_summary: BatchSummary
-  - HaltSignal: type="halt", error_message, reason
+  - Legend: issuing_company, project_site, distribution_board, circuits: list[Circuit]
+  - Circuit: tag, rating, description
+- LLMResponse (discriminated union via `response_type`)
+  - LegendUpdate: response_type="legend_update", legend: Legend, batch_summary: str
+  - HaltSignal: response_type="halt_signal", description
 
 Interactions:
 - app/cli → core/pipeline (orchestrates) → services (pdf, prompt, llm, storage, excel) and models.
-- core/logic has pure functions for batching and merging LegendState updates.
+- core/logic has pure functions for batching and merging Legend updates.
 
 Configuration strategy:
 - `config.settings.Settings` holds defaults; `.env` overrides; CLI overrides `.env`.
@@ -101,7 +99,7 @@ Each numbered item is one commit by the user, then reviewed by AI.
    - Expose a console script via `pyproject.toml` (e.g., `[project.scripts] ocr = "ocr.app.cli:main"`), install with `pip install -e .` and run via `ocr`.
 
 3. Models (schemas)
-   - Implement `models/schemas.py` with LegendState, Circuit, Load, BatchSummary, LegendUpdate, HaltSignal union.
+   - Implement `models/schemas.py` with Legend, Circuit, and an LLMResponse union consisting of LegendUpdate (with `response_type`, `legend`, `batch_summary`) and HaltSignal (with `response_type`, `description`).
 
 4. Storage service (run dirs + state IO)
    - Implement `services/storage.py` to create a timestamped run folder, write/read `state.json`, and persist small artifacts.
@@ -140,7 +138,7 @@ Acceptance per step: compiles/imports, basic smoke run where relevant, no archit
 - Dependencies (lean): `pydantic>=2`, `jinja2`, `litellm`, `pymupdf`, `openpyxl` (CLI uses stdlib `argparse`; optionally `rich` for logs).
 - Prompting: store a single `prompts/main.md` with placeholders like `{legend_json}`, `{batch_pages}`, `{previous_summary}`; render with `jinja2`.
 - Artifacts: under `runs/<timestamp>/` save `pages/`, `batches/<idx>/{prompt.md,response.json}`, `state.json`, and `final.xlsx` or `halt.json`.
-- Error handling: on invalid JSON, retry with a clarifying system message; on `type="halt"`, stop and persist context.
+- Error handling: on invalid JSON, retry with a clarifying system message; on `response_type="halt_signal"`, stop and persist context.
 - Performance: MVP uses sequential batches; consider concurrency later.
 - Configuration precedence: CLI > `.env` > code defaults. Keep `.env.example` up to date.
 - Simplicity-first: if choices are close, pick the simpler path that teaches clean boundaries and is easy to change later.
