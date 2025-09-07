@@ -18,7 +18,11 @@ class Settings(BaseSettings):
     @field_validator("pdf_path")
     @classmethod
     def validate_pdf_path(cls, pdf_path: Path) -> Path:
-        if not pdf_path.exists(): 
+        if not pdf_path.is_absolute():
+            pdf_path = (Path.cwd() / pdf_path)
+        pdf_path = pdf_path.resolve()
+
+        if not pdf_path.exists():
             raise ValueError(f"PDF path does not exist: {pdf_path}")
         if not pdf_path.is_file():
             raise ValueError(f"PDF path is not a file: {pdf_path}")
@@ -28,9 +32,11 @@ class Settings(BaseSettings):
     
     @field_validator("output_dir")
     @classmethod
-    def validate_output_dir(csl, output_dir: Path) -> Path:
-        if not output_dir.exists():
-            raise ValueError(f"Output directory does not exist: {output_dir}")
-        if not output_dir.is_dir():
+    def validate_output_dir(cls, output_dir: Path) -> Path:
+        if not output_dir.is_absolute():
+            output_dir = (Path.cwd() / output_dir)
+        output_dir = output_dir.resolve()
+
+        if output_dir.exists() and not output_dir.is_dir():
             raise ValueError(f"Output directory is not a directory: {output_dir}")
         return output_dir
