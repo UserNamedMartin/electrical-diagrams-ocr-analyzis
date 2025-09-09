@@ -137,7 +137,7 @@ Acceptance per step: compiles/imports, basic smoke run where relevant, no archit
 
 - Dependencies (lean): `pydantic>=2`, `jinja2`, `litellm`, `pymupdf`, `openpyxl` (CLI uses stdlib `argparse`; optionally `rich` for logs).
 - Prompting: store a single `prompts/main.md` with placeholders like `{legend_json}`, `{batch_pages}`, `{previous_summary}`; render with `jinja2`.
-- Artifacts: under `runs/<timestamp>/` save `pages/`, `batches/<idx>/{prompt.md,response.json}`, `state.json`, and `final.xlsx` or `halt.json`.
+- Artifacts: under `runs/<timestamp>/` save `pages/`, `batches/<batch_id>/{prompt.md,response.json}`; no `state.json` (storage is stateless by design), and final workbook saved as `output.xlsx` in the run root. Halt responses are saved as the batch `response.json` (no separate `halt.json`).
 - Error handling: on invalid JSON, retry with a clarifying system message; on `response_type="halt_signal"`, stop and persist context.
 - Performance: MVP uses sequential batches; consider concurrency later.
 - Configuration precedence: CLI > `.env` > code defaults. Keep `.env.example` up to date.

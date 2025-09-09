@@ -18,8 +18,6 @@ class Settings(BaseSettings):
     @field_validator("pdf_path")
     @classmethod
     def validate_pdf_path(cls, pdf_path: Path) -> Path:
-        if not pdf_path.is_absolute():
-            pdf_path = (Path.cwd() / pdf_path)
         pdf_path = pdf_path.resolve()
 
         if not pdf_path.exists():
@@ -33,8 +31,6 @@ class Settings(BaseSettings):
     @field_validator("output_dir")
     @classmethod
     def validate_output_dir(cls, output_dir: Path) -> Path:
-        if not output_dir.is_absolute():
-            output_dir = (Path.cwd() / output_dir)
         output_dir = output_dir.resolve()
 
         if output_dir.exists() and not output_dir.is_dir():
